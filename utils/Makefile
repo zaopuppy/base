@@ -5,8 +5,8 @@ LEX    := flex
 YACC   := bison
 
 TARGET := main
-CFILES :=
-CXXFILES := main.cc
+CFILES := zlist.c main.c
+CXXFILES :=
 
 # intermedia files
 OBJFILES := $(CFILES:%.c=obj/%.o) $(CXXFILES:%.cc=obj/%.o)
