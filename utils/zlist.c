@@ -1,66 +1,95 @@
 #include "zlist.h"
 
-
 #include <stdlib.h>
-
+#include <assert.h>
 
 // impliment
-struct node_t*
-new_list() {
-	struct node_t *head = (struct node_t*)malloc(sizeof(struct node_t));
+struct list_t*
+list_new() {
+	struct list_t *list = (struct list_t*)malloc(sizeof(struct list_t));
 
-	head->prev = NULL;
-	head->next = NULL;
+	list->size = 0;
+	list->first = NULL;
+	list->last = NULL;
 
-	return head;
+	return list;
+}
+
+void
+list_free(struct list_t *list) {
+	struct node_t *nd;
+	struct node_t *tmp;
+
+	nd = list->first;
+	while (nd) {
+		tmp = nd;
+		nd = nd->next;
+		free(tmp);
+	}
+
+	free(list);
 }
 
 // TODO: rewrite it with macro
-struct node_t*
-push_front(struct node_t *head, struct node_t *new_nd) {
-	struct node_t *next = head->next;
+void
+list_push_front(struct list_t *list, struct node_t *new_nd) {
+	struct node_t *first = list->first;
 
-	if (next) {
-		head->next->prev = new_nd;
-		head->next = new_nd;
-		new_nd->next = next;
-		new_nd->prev = head;
-	} else {
-		head->next = new_nd;
+	if (!first) {
+		assert(list->size == 0);
+		list->first = new_nd;
+		list->last = new_nd;
 		new_nd->next = NULL;
-		new_nd->prev = head;
+		new_nd->prev = NULL;
+		new_nd->list = list;
+
+		list->size = 1;
+		
+		return;
 	}
 
-	return new_nd;
+	struct node_t *next = first->next;
+	if (next) {
+		first->next->prev = new_nd;
+		first->next = new_nd;
+		new_nd->next = next;
+		new_nd->prev = first;
+	} else {
+		first->next = new_nd;
+		new_nd->next = NULL;
+		new_nd->prev = first;
+	}
+
+	++(list->size);
 }
 
-struct node_t*
-sort_push(struct node_t *head, struct node_t *new_nd, comparator cmp) {
+void
+list_sort_push(struct list_t *list, struct node_t *new_nd, comparator cmp) {
 	struct node_t *nd;
 	int rv;
 
-	if (head->next == NULL) {
-		return push_front(head, new_nd);
+	if (list->first == NULL) {
+		return list_push_front(list, new_nd);
 	}
 	
-	for (nd = head->next; nd; nd = nd->next) {
+	for (nd = list->first; nd; nd = nd->next) {
 		rv = cmp(new_nd, nd);
 		if (rv < 0) {
-			return insert(nd, new_nd);
+			return list_insert(list, nd, new_nd);
 		}
 
 		// last one
 		if (nd->next == NULL) {
-			return append(nd, new_nd);
+			return list_append(list, nd, new_nd);
 		}
 	}
 
 	// should not happen
-	return NULL;
+	assert(0);
 }
 
-struct node_t*
-insert(struct node_t *nd, struct node_t *new_nd) {
+void
+list_insert(struct list_t *list, struct node_t *nd, struct node_t *new_nd) {
 	struct node_t* prev = nd->next;
 	if (prev) {
 		nd->prev->next = new_nd;
@@ -71,13 +100,16 @@ insert(struct node_t *nd, struct node_t *new_nd) {
 		nd->prev = new_nd;
 		new_nd->prev = NULL;
 		new_nd->next = nd;
+		// update `first'
+		list->first = new_nd;
 	}
 
-	return new_nd;
+	++(list->size);
 }
 
-struct node_t*
-append(struct node_t *nd, struct node_t *new_nd) {
+void
+list_append(struct list_t *list, struct node_t *nd, struct node_t *new_nd) {
+	
 	struct node_t* next = nd->next;
 	if (next) {
 		nd->next->prev = new_nd;
@@ -88,8 +120,43 @@ append(struct node_t *nd, struct node_t *new_nd) {
 		nd->next = new_nd;
 		new_nd->prev = nd;
 		new_nd->next = NULL;
+		// update `last'
+		list->last = new_nd;
 	}
 
-	return new_nd;
+	++(list->size);
 }
+
+void
+list_remove(struct list_t *list, struct node_t *nd)
+{
+	// should not be head
+	assert(nd);
+
+	struct node_t *prev, *next;
+	
+	prev = nd->prev;
+	next = nd->next;
+
+	if (prev) {
+		prev->next = next;
+	} else {
+		// update `first'
+		list->first = nd->next;
+	}
+	if (next) {
+		next->prev = prev;
+	} else {
+		// update `last'
+		list->last = nd->prev;
+	}
+
+	nd->prev = NULL;
+	nd->next = NULL;
+
+	free(nd);
+
+	--(list->size);
+}
+
 
