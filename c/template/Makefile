@@ -5,9 +5,9 @@ CPP    := gcc
 LEX    := flex
 YACC   := bison
 
-TARGET := libzutil.a
-CFILES := zlist.c zlog.c
-CXXFILES :=
+TARGET := main
+CFILES :=
+CXXFILES := main.cc
 
 # intermedia files
 OBJFILES := $(CFILES:%.c=obj/%.o) $(CXXFILES:%.cc=obj/%.o)
@@ -19,7 +19,7 @@ ARFLAGS := -r
 
 $(TARGET) : $(OBJFILES)
 	rm -f $@
-	$(AR) $(ARFLAGS) $@ $(OBJFILES)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJFILES)
 
 obj/%.d : %.cc
 	rm -f $@

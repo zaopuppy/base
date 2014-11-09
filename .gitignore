@@ -11,3 +11,12 @@
 *.lai
 *.la
 *.a
+
+# --- added by zhaoyi ---
+*.pyc
+*.bak
+*.log
+*.out
+
+# --- added by zhaoyi ---
+

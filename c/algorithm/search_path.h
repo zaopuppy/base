@@ -1,0 +1,8 @@
+#ifndef __Z_ALGORITHM_SEARCH_PATH_H_
+#define __Z_ALGORITHM_SEARCH_PATH_H_
+
+
+
+#endif // __Z_ALGORITHM_SEARCH_PATH_H_
+
+
