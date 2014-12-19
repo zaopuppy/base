@@ -10,10 +10,23 @@ import os.path
 import subprocess
 import sys
 
-# try:
-#     import pyreadline
-# except ImportError as e:
-#     print("pyreadline is not found, bash-like key binding is not available.")
+if sys.version_info.major != 3:
+    print("python 3.x needed")
+    quit(-1)
+
+try:
+    import readline
+except ImportError as e:
+    pass
+
+try:
+    if not readline:
+        import pyreadline as readline
+except ImportError as e:
+    pass
+
+if not readline:
+    print("pyreadline is not found, bash-like key binding is not available.")
 
 
 # TODO: support pipeline
@@ -36,24 +49,29 @@ class Shell:
         # use RB-Tree instead of normal map, we need auto-complete
         # TODO: self.cmd_map = [] -> "path" -> [ "cmd.exe", "fde.dll" ]
         self.cmd_map = {}
+        self.errno = 0
 
     def init(self):
         self.load_script_in_path(self.paths)
 
     def load_script_in_path(self, paths):
         for p in paths:
+            self.cmd_map[p] = []
             for f in os.listdir(p):
-                file_name = os.path.basename(f)
-                # TODO: over write old value, this is not what we want,
-                # we should always use the first one
-                self.cmd_map[file_name] = os.path.join(p, f)
+                self.cmd_map[p].append(f)
+                # file_name = os.path.basename(f)
+                # self.cmd_map[file_name] = os.path.join(p, f)
 
     def run(self):
         # interactive mode
         self.is_running = True
+        read_line = readline.Readline()
         while self.is_running:
             try:
-                line = input(self.ps1)
+                if not read_line:
+                    line = input(self.ps1)
+                else:
+                    line = read_line.readline(self.ps1)
             except KeyboardInterrupt as e:
                 print()
                 continue
@@ -77,6 +95,18 @@ class Shell:
             [script,] + args
         )
 
+    def find_cmd_in_paths(self, cmd):
+        for path, cmds in self.cmd_map.items():
+            if cmd in cmds:
+                return os.path.join(path, cmd)
+            elif cmd + ".py" in cmds:
+                return os.path.join(path, cmd + ".py")
+            elif cmd + ".exe" in cmds:
+                return os.path.join(path, cmd + ".exe")
+            else:
+                pass
+        return None
+
     def process_command(self, cmd, args):
         # try built-in command first
         handler_name = "command_" + cmd
@@ -84,15 +114,27 @@ class Shell:
             return getattr(self, handler_name)(cmd, args)
 
         # find in paths
-        if cmd in self.cmd_map.keys():
-            return self.execute(self.cmd_map.get(cmd, None))
-        elif cmd + ".py" in self.cmd_map.keys():
-            return self.execute_python(self.cmd_map.get(cmd + ".py", None), args)
-        elif cmd + ".exe" in self.cmd_map.keys():
-            return self.execute(self.cmd_map.get(cmd + ".exe", None), args)
-        else:
+        cmd_path = self.find_cmd_in_paths(cmd)
+        if not cmd_path:
             print("[{}]: not such command or file".format(cmd))
             return -1
+
+        if cmd_path.endswith(".py"):
+            return self.execute_python(cmd_path, args)
+        else:
+            return self.execute(cmd_path, args)
+
+    def replace_variable(self, s):
+        """ TODO: a very simple but usable implementation"""
+        if s == "$?":
+            if not self.errno:
+                self.errno = 0
+            return str(self.errno)
+        else:
+            return s
+
+    def command_echo(self, cmd, args):
+        print(" ".join(map(self.replace_variable, args)))
 
     def command_cd(self, cmd, args):
         if not args or len(args) != 1:
