@@ -7,6 +7,26 @@ __author__ = 'zaopuppy'
 import sys
 import re
 import time
+import getopt
+
+
+if sys.version_info.major != 3:
+    print("python 3.x needed")
+    quit(-1)
+
+try:
+    import readline
+except ImportError as e:
+    pass
+
+try:
+    if not readline:
+        import pyreadline as readline
+except ImportError as e:
+    pass
+
+if not readline:
+    print("pyreadline is not found, bash-like key binding is not available.")
 
 
 def usage():
@@ -18,8 +38,9 @@ def usage():
 def get_line(file_list, max_len=4096):
     if len(file_list) <= 0:
         # _io.TextIOWrapper'
-        for line in iter(lambda: sys.stdin.readline(max_len), b''):
-            yield line
+        read_line = readline.Readline()
+        while True:
+            yield read_line.readline()
     else:
         for f in file_list:
             with open(f, "rb") as fp:
@@ -30,12 +51,14 @@ def get_line(file_list, max_len=4096):
 
 
 def main():
-    if len(sys.argv) <= 1:
+    optlist, args = getopt.getopt(sys.argv[1:], "i", "ignore-case=")
+
+    if len(args) <= 0:
         usage()
         return 1
 
-    pattern = sys.argv[1]
-    file_list = sys.argv[2:]
+    pattern = args[0]
+    file_list = args[1:]
 
     prog = re.compile(pattern)
 
