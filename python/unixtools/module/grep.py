@@ -10,24 +10,15 @@ import time
 import getopt
 
 
-if sys.version_info.major != 3:
-    print("python 3.x needed")
-    quit(-1)
-
 try:
     import readline
 except ImportError as e:
-    pass
+    print("warn: cant find readline")
 
-try:
-    if not readline:
-        import pyreadline as readline
-except ImportError as e:
-    pass
 
-if not readline:
-    print("pyreadline is not found, bash-like key binding is not available.")
-
+if sys.version_info.major != 3:
+    print("python 3.x needed")
+    quit(-1)
 
 def usage():
     print("""
@@ -35,12 +26,12 @@ def usage():
     """)
 
 
+IGNORE_CASE = False
+
 def get_line(file_list, max_len=4096):
     if len(file_list) <= 0:
-        # _io.TextIOWrapper'
-        read_line = readline.Readline()
         while True:
-            yield read_line.readline()
+            yield input()
     else:
         for f in file_list:
             with open(f, "rb") as fp:
@@ -57,14 +48,26 @@ def main():
         usage()
         return 1
 
+    for o, a, in optlist:
+        if o == "-i":
+            global IGNORE_CASE
+            IGNORE_CASE = True
+
     pattern = args[0]
     file_list = args[1:]
 
-    prog = re.compile(pattern)
+    if IGNORE_CASE:
+        prog = re.compile(pattern.lower())
+    else:
+        prog = re.compile(pattern)
 
     for line in get_line(file_list):
-        if prog.search(line):
-            print(line, end='')
+        if IGNORE_CASE:
+            if prog.search(line.lower()):
+                print(line, end='')
+        else:
+            if prog.search(line):
+                print(line, end='')
 
 
 if __name__ == "__main__":

@@ -10,24 +10,16 @@ import os.path
 import subprocess
 import sys
 
-if sys.version_info.major != 3:
-    print("python 3.x needed")
-    quit(-1)
 
 try:
     import readline
 except ImportError as e:
-    pass
+    print("warn: cant find readline")
 
-try:
-    if not readline:
-        import pyreadline as readline
-except ImportError as e:
-    pass
 
-if not readline:
-    print("pyreadline is not found, bash-like key binding is not available.")
-
+if sys.version_info.major != 3:
+    print("python 3.x needed")
+    quit(-1)
 
 # TODO: support pipeline
 # TODO: support script
@@ -65,13 +57,14 @@ class Shell:
     def run(self):
         # interactive mode
         self.is_running = True
-        read_line = readline.Readline()
+        # read_line = readline.Readline()
         while self.is_running:
             try:
-                if not read_line:
-                    line = input(self.ps1)
-                else:
-                    line = read_line.readline(self.ps1)
+                line = input(self.ps1)
+                # if not read_line:
+                #     line = input(self.ps1)
+                # else:
+                #     line = read_line.readline(self.ps1)
             except KeyboardInterrupt as e:
                 print()
                 continue
