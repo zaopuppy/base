@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pyreadline
+import readline
+import re
+
+import plyplus
 
 
 if __name__ == "__main__":
-    readline = pyreadline.Readline()
-    s = readline.readline()
-    print(s)
+    # re.match('.*(?<!\\)b', 'cccbbbbbbbbbbbbb')
+    parser = plyplus.Grammar(open("bash.g"))
+    ast = parser.parse('D:\ls.exe > 1.txt|ls')
+    print(ast)
+

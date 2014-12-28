@@ -25,9 +25,6 @@ def usage():
     <grep> <pattern> files
     """)
 
-
-IGNORE_CASE = False
-
 def get_line(file_list, max_len=4096):
     if len(file_list) <= 0:
         while True:
@@ -48,26 +45,19 @@ def main():
         usage()
         return 1
 
+    flag = 0
     for o, a, in optlist:
         if o == "-i":
-            global IGNORE_CASE
-            IGNORE_CASE = True
+            flag |= re.IGNORECASE
 
     pattern = args[0]
     file_list = args[1:]
 
-    if IGNORE_CASE:
-        prog = re.compile(pattern.lower())
-    else:
-        prog = re.compile(pattern)
+    prog = re.compile(pattern, flag)
 
     for line in get_line(file_list):
-        if IGNORE_CASE:
-            if prog.search(line.lower()):
-                print(line, end='')
-        else:
-            if prog.search(line):
-                print(line, end='')
+        if prog.search(line):
+            print(line, end='')
 
 
 if __name__ == "__main__":
