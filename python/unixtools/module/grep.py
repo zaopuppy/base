@@ -27,8 +27,10 @@ def usage():
 
 def get_line(file_list, max_len=4096):
     if len(file_list) <= 0:
-        while True:
-            yield input()
+        for line in iter(lambda: sys.stdin.readline(max_len), ''):
+            yield line
+        # while True:
+        #     yield input()
     else:
         for f in file_list:
             with open(f, "rb") as fp:
@@ -57,6 +59,7 @@ def main():
 
     for line in get_line(file_list):
         if prog.search(line):
+            # win32 needs this `end=''`, but linux/mac doesn't
             print(line, end='')
 
 

@@ -76,7 +76,7 @@ class Shell:
 
     def execute(self, exe, args):
         try:
-            return subprocess.Popen([exe,] + args).wait()
+            return subprocess.Popen([exe,] + args).communicate()
         except Exception as e:
             print("exception while execute: [{}]".format(exe))
         except KeyboardInterrupt as e:
@@ -154,9 +154,9 @@ class Shell:
         print(self.cmd_map)
 
 def main():
-    # sh = Shell(path=["c:\\Windows\\System32\\"])
+    path = os.path.pathsep.join((os.getenv("PATH"), os.path.join(os.getcwd(), "module")))
     sh = Shell(
-        path=[os.path.join(os.getcwd(), "module")]
+        path=path.split(";")
     )
     sh.init()
     if len(sys.argv) <= 1:
