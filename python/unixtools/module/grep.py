@@ -6,7 +6,6 @@ __author__ = 'zaopuppy'
 
 import sys
 import re
-import time
 import getopt
 
 
@@ -20,13 +19,16 @@ if sys.version_info.major != 3:
     print("python 3.x needed")
     quit(-1)
 
+
 def usage():
     print("""
     <grep> <pattern> files
     """)
 
+
 def get_line(file_list, max_len=4096):
     if len(file_list) <= 0:
+        # don't use input(), or we can't get input from pipe in win32 platform(works fine under Mac OS, though)
         for line in iter(lambda: sys.stdin.readline(max_len), ''):
             yield line
         # while True:
