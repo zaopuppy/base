@@ -78,6 +78,62 @@ def extract_cmd_list(ast):
     return [extract_cmd_args(c) for c in ast.tail]
 
 
+class Command:
+    """
+    pass
+    """
+    def __init__(self, shell, args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
+        self.shell = shell
+        self.args = args
+        self.stdin = stdin
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def communicate(self):
+        raise NotImplementedError
+
+    def print(self, msg, end='\n', flush=False):
+        self.stdout.write(msg + end)
+        if flush:
+            self.stdout.flush()
+
+    def input(self, prompt=''):
+        self.stdout.write(prompt)
+        self.stdout.flush()
+        return self.stdin.readline(2048)
+
+
+class Echo(Command):
+    def communicate(self):
+        self.print(" ".join(self.args[1:]))
+
+
+class Cd(Command):
+    def communicate(self):
+        os.chdir(self.args[1])
+        self.shell.cwd = self.args[1]
+
+
+class Ls(Command):
+    def communicate(self):
+        os.listdir(self.shell.cwd)
+
+
+class Pwd(Command):
+    def communicate(self):
+        self.print(self.shell.cwd)
+
+
+class Exit(Command):
+    def communicate(self):
+        self.shell.is_running = False
+
+
+class Help(Command):
+    def communicate(self):
+        self.print(self.shell.cmd_map)
+
+
 # TODO: support pipeline
 # TODO: support script
 # TODO: alias
@@ -101,6 +157,15 @@ class Shell:
         self.errno = 0
         self.parser = plyplus.Grammar(open("bash.g"))
         self.load_script_in_path(self.paths)
+        self.builtin = {
+            'echo': Echo,
+            'cd': Cd,
+            'ls': Ls,
+            'dir': Ls,
+            'pwd': Pwd,
+            'exit': Exit,
+            'Help': Help,
+        }
 
     def load_script_in_path(self, paths):
         for p in paths:
@@ -129,10 +194,10 @@ class Shell:
 
                 # create sub-processes
                 process_list = []
-                last_out = None
-                for cmd in cmd_list[0:-1]:
+                last_out = sys.stdin
+                for args in cmd_list[0:-1]:
                     # p = subprocess.Popen(cmd, stdin=last_out, stdout=subprocess.PIPE)
-                    p = self.create_subprocess(cmd, stdin=last_out, stdout=subprocess.PIPE)
+                    p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
                     process_list.append(p)
                     last_out = p.stdout
                 process_list.append(subprocess.Popen(cmd_list[-1], stdin=last_out))
@@ -147,16 +212,11 @@ class Shell:
             except Exception as e:
                 print(e)
                 continue
-            args = line.strip().split()
-            if len(args) > 0:
-                self.errno = self.process_command(args[0], args[1:])
-            else:
-                self.errno = 0
 
     @staticmethod
     def execute(exe, args):
         try:
-            return subprocess.Popen([exe,] + args).communicate()
+            return subprocess.Popen([exe, ] + args).communicate()
         except Exception as e:
             print("exception while execute: [{}]".format(exe))
         except KeyboardInterrupt as e:
@@ -213,36 +273,20 @@ class Shell:
         else:
             return s
 
-    def command_echo(self, cmd, args):
-        print(" ".join(map(self.replace_variable, args)))
+    def is_builtin(self, cmd):
+        return cmd in self.builtin.keys()
 
-    def command_cd(self, cmd, args):
-        if not args or len(args) != 1:
-            print("no enough arguments")
-            return -1
-
-        new_path = os.path.join(self.cwd, args[0])
-        os.chdir(new_path)
-        self.cwd = os.getcwd()
-
-    def command_ls(self, cmd, args):
-        print(os.listdir(self.cwd))
-
-    def command_dir(self, cmd, args):
-        return self.command_ls(cmd, args)
-
-    def command_pwd(self, cmd, args):
-        print(self.cwd)
-
-    def command_exit(self, cmd, args):
-        self.is_running = False
-
-    def command_help(self, cmd, args):
-        print(self.cmd_map)
-
-    @staticmethod
-    def create_subprocess(args, stdin=None, stdout=None, stderr=None):
-        return subprocess.Popen(args, stdin, stdout, stderr)
+    def create_subprocess(self, args, stdin=None, stdout=None, stderr=None):
+        cmd = args[0]
+        builtin = False;
+        if builtin
+        if self.is_builtin(cmd):
+            return self.builtin.get(cmd, None)
+        else:
+            full_path = self.find_cmd_in_paths(cmd)
+            if not full_path:
+                raise Exception("Not such command or file")
+            return subprocess.Popen([full_path, ] + args[1:], stdin, stdout, stderr)
 
 
 def main():
@@ -258,6 +302,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    print("TEST")
+    # cmd = Echo(None, ["echo", "haha", "Good"])
+    # cmd.communicate()
 
 
