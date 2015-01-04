@@ -5,10 +5,12 @@
 __all__ = ["Shell"]
 
 
+import io
 import os
 import os.path
 import subprocess
 import sys
+import threading
 import plyplus
 
 
@@ -82,25 +84,53 @@ class Command:
     """
     pass
     """
+
+    PIPE = -1
+
     def __init__(self, shell, args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
         self.shell = shell
         self.args = args
-        self.stdin = stdin
-        self.stdout = stdout
-        self.stderr = stderr
+
+        if stdin == Command.PIPE:
+            p2cread, p2cwrite = os.pipe()
+            self.stdin_read = io.open(p2cread, "rb", -1)
+            self.stdin = io.open(p2cwrite, "wb", -1)
+        else:
+            self.stdin_read, self.stdin = stdin, None
+
+        if stdout == Command.PIPE:
+            c2pread, c2pwrite = os.pipe()
+            self.stdout = io.open(c2pread, "rb", -1)
+            self.stdout_write = io.open(c2pwrite, "wb", -1)
+        else:
+            self.stdout, self.stdout_write = None, stdout
+
+        if stderr == Command.PIPE:
+            errread, errwrite = os.pipe()
+            self.stderr = io.open(errread, "rb", -1)
+            self.stderr_write = io.open(errwrite, "wb", -1)
+        else:
+            self.stderr, self.stderr_write = None, stderr
+
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def run(self):
+        self.print("run")
 
     def communicate(self):
-        raise NotImplementedError
+        # raise NotImplementedError
+        self.thread.join()
 
     def print(self, msg, end='\n', flush=False):
-        self.stdout.write(msg + end)
+        self.stdout_write.write(msg + end)
         if flush:
-            self.stdout.flush()
+            self.stdout_write.flush()
 
     def input(self, prompt=''):
-        self.stdout.write(prompt)
-        self.stdout.flush()
-        return self.stdin.readline(2048)
+        self.stdout_write.write(prompt)
+        self.stdout_write.flush()
+        return self.stdin_read.readline(2048)
 
 
 class Echo(Command):
@@ -278,10 +308,12 @@ class Shell:
 
     def create_subprocess(self, args, stdin=None, stdout=None, stderr=None):
         cmd = args[0]
-        builtin = False;
-        if builtin
         if self.is_builtin(cmd):
-            return self.builtin.get(cmd, None)
+            cmd_type = self.builtin.get(cmd)
+            if cmd_type is not None:
+                return cmd_type(self, args, cmd, stdin, stdout, stderr)
+            else:
+                return None
         else:
             full_path = self.find_cmd_in_paths(cmd)
             if not full_path:
@@ -302,9 +334,11 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    print("TEST")
+    main()
+    # print("TEST")
     # cmd = Echo(None, ["echo", "haha", "Good"])
+    # cmd.communicate()
+    # cmd = Command(None, None)
     # cmd.communicate()
 
 
