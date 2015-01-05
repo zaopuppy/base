@@ -16,7 +16,8 @@ import plyplus
 
 try:
     import readline
-except ImportError as e:
+except ImportError:
+    readline = None
     print("warn: cant find readline")
 
 
@@ -87,42 +88,52 @@ class Command:
 
     PIPE = -1
 
-    def __init__(self, shell, args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
+    def __init__(self, shell, args, stdin=None, stdout=None, stderr=None):
         self.shell = shell
         self.args = args
 
         if stdin == Command.PIPE:
             p2cread, p2cwrite = os.pipe()
-            self.stdin_read = io.open(p2cread, "rb", -1)
-            self.stdin = io.open(p2cwrite, "wb", -1)
+            self.stdin_read = io.TextIOWrapper(io.open(p2cread, "rb", -1))
+            self.stdin = io.TextIOWrapper(io.open(p2cwrite, "wb", -1))
         else:
-            self.stdin_read, self.stdin = stdin, None
+            self.stdin_read, self.stdin = sys.stdin, None
 
         if stdout == Command.PIPE:
             c2pread, c2pwrite = os.pipe()
-            self.stdout = io.open(c2pread, "rb", -1)
-            self.stdout_write = io.open(c2pwrite, "wb", -1)
+            self.stdout = io.TextIOWrapper(io.open(c2pread, "rb", -1))
+            self.stdout_write = io.TextIOWrapper(io.open(c2pwrite, "wb", -1))
         else:
-            self.stdout, self.stdout_write = None, stdout
+            self.stdout, self.stdout_write = None, sys.stdout
 
         if stderr == Command.PIPE:
             errread, errwrite = os.pipe()
-            self.stderr = io.open(errread, "rb", -1)
-            self.stderr_write = io.open(errwrite, "wb", -1)
+            self.stderr = io.TextIOWrapper(io.open(errread, "rb", -1))
+            self.stderr_write = io.TextIOWrapper(io.open(errwrite, "wb", -1))
         else:
-            self.stderr, self.stderr_write = None, stderr
+            self.stderr, self.stderr_write = None, sys.stderr
 
-        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread = threading.Thread(target=self.execute, daemon=True)
         self.thread.start()
 
-    def run(self):
-        self.print("run")
+    def execute(self):
+        self.print("NotImplementedError")
 
     def communicate(self):
-        # raise NotImplementedError
         self.thread.join()
 
+        for f in (self.stdin_read,
+                  self.stdin,
+                  self.stdout,
+                  self.stdout_write,
+                  self.stderr,
+                  self.stderr_write):
+            if f is not None:
+                f.close()
+
     def print(self, msg, end='\n', flush=False):
+        # print(type(self.stdout_write))
+        # print(type(msg))
         self.stdout_write.write(msg + end)
         if flush:
             self.stdout_write.flush()
@@ -134,33 +145,33 @@ class Command:
 
 
 class Echo(Command):
-    def communicate(self):
+    def execute(self):
         self.print(" ".join(self.args[1:]))
 
 
 class Cd(Command):
-    def communicate(self):
+    def execute(self):
         os.chdir(self.args[1])
         self.shell.cwd = self.args[1]
 
 
 class Ls(Command):
-    def communicate(self):
-        os.listdir(self.shell.cwd)
+    def execute(self):
+        self.print(str(os.listdir(self.shell.cwd)) + "\r\n")
 
 
 class Pwd(Command):
-    def communicate(self):
+    def execute(self):
         self.print(self.shell.cwd)
 
 
 class Exit(Command):
-    def communicate(self):
+    def execute(self):
         self.shell.is_running = False
 
 
 class Help(Command):
-    def communicate(self):
+    def execute(self):
         self.print(self.shell.cmd_map)
 
 
@@ -212,6 +223,14 @@ class Shell:
             try:
                 line = input(self.ps1)
 
+                if not line:
+                    continue
+
+                line = line.strip()
+
+                if len(line) == 0:
+                    continue
+
                 # parse input
                 ast = self.parser.parse(line)
 
@@ -226,17 +245,18 @@ class Shell:
                 process_list = []
                 last_out = sys.stdin
                 for args in cmd_list[0:-1]:
-                    # p = subprocess.Popen(cmd, stdin=last_out, stdout=subprocess.PIPE)
+                    print("begin create")
                     p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
+                    print("end create")
                     process_list.append(p)
                     last_out = p.stdout
-                process_list.append(subprocess.Popen(cmd_list[-1], stdin=last_out))
+                process_list.append(self.create_subprocess(cmd_list[-1], stdin=last_out))
 
                 # run them
                 for p in process_list[0:-1]:
                     p.stdout.close()
                 process_list[-1].communicate()
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 print()
                 continue
             except Exception as e:
@@ -310,15 +330,17 @@ class Shell:
         cmd = args[0]
         if self.is_builtin(cmd):
             cmd_type = self.builtin.get(cmd)
-            if cmd_type is not None:
-                return cmd_type(self, args, cmd, stdin, stdout, stderr)
-            else:
-                return None
+            return cmd_type(self, args, stdin=stdin, stdout=stdout, stderr=stderr)
         else:
             full_path = self.find_cmd_in_paths(cmd)
             if not full_path:
                 raise Exception("Not such command or file")
-            return subprocess.Popen([full_path, ] + args[1:], stdin, stdout, stderr)
+            if full_path.endswith(".py"):
+                return subprocess.Popen(
+                    ["D:\\Python34\python.exe", full_path] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
+            else:
+                return subprocess.Popen(
+                    [full_path, ] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
 
 
 def main():

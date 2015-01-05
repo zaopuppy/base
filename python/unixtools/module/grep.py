@@ -12,6 +12,7 @@ import getopt
 try:
     import readline
 except ImportError as e:
+    readline = None
     print("warn: cant find readline")
 
 
@@ -27,12 +28,12 @@ def usage():
 
 
 def get_line(file_list, max_len=4096):
+    print("get_line")
     if len(file_list) <= 0:
         # don't use input(), or we can't get input from pipe in win32 platform(works fine under Mac OS, though)
         for line in iter(lambda: sys.stdin.readline(max_len), ''):
+            print("input: " + line)
             yield line
-        # while True:
-        #     yield input()
     else:
         for f in file_list:
             with open(f, "rb") as fp:
