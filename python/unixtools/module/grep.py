@@ -28,11 +28,11 @@ def usage():
 
 
 def get_line(file_list, max_len=4096):
-    print("get_line")
+    # print("get_line")
     if len(file_list) <= 0:
         # don't use input(), or we can't get input from pipe in win32 platform(works fine under Mac OS, though)
         for line in iter(lambda: sys.stdin.readline(max_len), ''):
-            print("input: " + line)
+            # print("input: " + line)
             yield line
     else:
         for f in file_list:

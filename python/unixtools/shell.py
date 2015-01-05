@@ -95,20 +95,20 @@ class Command:
         if stdin == Command.PIPE:
             p2cread, p2cwrite = os.pipe()
             self.stdin_read = io.TextIOWrapper(io.open(p2cread, "rb", -1))
-            self.stdin = io.TextIOWrapper(io.open(p2cwrite, "wb", -1))
+            self.stdin = io.open(p2cwrite, "wb", -1)
         else:
             self.stdin_read, self.stdin = sys.stdin, None
 
         if stdout == Command.PIPE:
             c2pread, c2pwrite = os.pipe()
-            self.stdout = io.TextIOWrapper(io.open(c2pread, "rb", -1))
+            self.stdout = io.open(c2pread, "rb", -1)
             self.stdout_write = io.TextIOWrapper(io.open(c2pwrite, "wb", -1))
         else:
             self.stdout, self.stdout_write = None, sys.stdout
 
         if stderr == Command.PIPE:
             errread, errwrite = os.pipe()
-            self.stderr = io.TextIOWrapper(io.open(errread, "rb", -1))
+            self.stderr = io.open(errread, "rb", -1)
             self.stderr_write = io.TextIOWrapper(io.open(errwrite, "wb", -1))
         else:
             self.stderr, self.stderr_write = None, sys.stderr
@@ -243,7 +243,7 @@ class Shell:
 
                 # create sub-processes
                 process_list = []
-                last_out = sys.stdin
+                last_out = None
                 for args in cmd_list[0:-1]:
                     print("begin create")
                     p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
