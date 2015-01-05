@@ -7,21 +7,61 @@ import re
 import plyplus
 
 import subprocess
+import os
+import io
+
+import shell
 
 
-def test_pipe():
+
+def test_pipe1():
     p1 = subprocess.Popen(
         ["C:\\Windows\\system32\\cmd.exe",
          "/c",
          "dir"],
         stdin=None, stdout=subprocess.PIPE, stderr=None)
+
+    # p2 = subprocess.Popen(
+    #     ["D:\\Python34\python.exe",
+    #      "D:\\source\\base\\python\\unixtools\\module\\grep.py",
+    #      "."],
+    #     stdin=pipe_read, stdout=None, stderr=None)
     p2 = subprocess.Popen(
-        ["D:\\Python34\python.exe",
-         "D:\\source\\base\\python\\unixtools\\module\\grep.py",
-         "."],
+        ["/usr/local/bin/python3",
+         "/Volumes/Data/workspaces/base/python/unixtools/module/grep.py",
+         "l"],
         stdin=p1.stdout, stdout=None, stderr=None)
+
     p1.stdout.close()
     p2.communicate()
+
+
+def test_pipe2():
+    p2cread, p2cwrite = os.pipe()
+    pipe_read = io.TextIOWrapper(io.open(p2cread, "rb"))
+    pipe_write = io.TextIOWrapper(io.open(p2cwrite, "wb"))
+    pipe_write.write("abc\nadsl\naaal")
+
+    p2 = subprocess.Popen(
+        ["/usr/local/bin/python3",
+         "/Volumes/Data/workspaces/base/python/unixtools/module/grep.py",
+         "l"],
+        stdin=pipe_read, stdout=None, stderr=None)
+
+    pipe_write.close()
+    p2.communicate()
+
+
+def test_pipe():
+    cmd = shell.Command(None, [], stdout=shell.Command.PIPE)
+
+    p = subprocess.Popen(
+        ["/usr/local/bin/python3",
+         "/Volumes/Data/workspaces/base/python/unixtools/module/grep.py",
+         "l"],
+        stdin=cmd.stdout, stdout=None, stderr=None)
+
+    p.communicate()
 
 
 def transfer_dbl_quo_string(s):
@@ -101,7 +141,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    test_pipe()
 
 
 
