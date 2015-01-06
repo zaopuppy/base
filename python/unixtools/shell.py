@@ -141,8 +141,8 @@ class Command:
             f.close()
 
     def print(self, msg, end='\n', flush=False):
-        # print(type(self.stdout_write))
-        # print(type(msg))
+        if not isinstance(msg, str):
+            msg = str(msg)
         self.stdout_write.write(msg + end)
         if flush:
             self.stdout_write.flush()
@@ -182,7 +182,24 @@ class Exit(Command):
 
 class Help(Command):
     def execute(self):
-        self.print(self.shell.cmd_map)
+        if len(self.args) > 1:
+            match = self.args[1]
+        else:
+            match = None
+        for k, v in self.shell.cmd_map.items():
+            if match is not None:
+                # FIXME: may cause performance issue if there are too many execute files in paths
+                cmd_list = tuple(filter(lambda x: match in x, v))
+                if len(cmd_list) > 0:
+                    self.print('[' + k + ']')
+                    for f in cmd_list:
+                        print(f)
+                    print()
+            else:
+                self.print('[' + k + ']')
+                for i in v:
+                    print(i)
+                print()
 
 
 class Test(Command):
@@ -275,6 +292,9 @@ class Shell:
                 process_list[-1].communicate()
             except KeyboardInterrupt:
                 print("^C")
+                continue
+            except plyplus.TokenizeError as tokenizeError:
+                print(tokenizeError)
                 continue
 
     def find_cmd_in_paths(self, cmd):
