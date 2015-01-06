@@ -26,7 +26,7 @@ if sys.version_info.major != 3:
     quit(-1)
 
 
-def transfer_dbl_quo_string(s):
+def unescape_dbl_quo_string(s):
     result = ""
     escaping = False
     for idx, c in enumerate(s):
@@ -39,12 +39,21 @@ def transfer_dbl_quo_string(s):
             escaping = False
             if c == '\\':
                 result += '\\'
+            elif c == 'a':
+                # ascii bell
+                result += '\a'
+            elif c == 'b':
+                result += '\b'
+            elif c == 'f':
+                result += '\f'
             elif c == 'n':
                 result += '\n'
             elif c == 'r':
                 result += '\r'
             elif c == 't':
                 result += '\t'
+            elif c == 'v':
+                result += '\v'
             elif c == '"':
                 result += '"'
             elif c == "'":
@@ -56,15 +65,15 @@ def transfer_dbl_quo_string(s):
     return result
 
 
-def transfer_quo_string(s):
-    return transfer_dbl_quo_string(s)
+def unescape_quo_string(s):
+    return unescape_dbl_quo_string(s)
 
 
-def transfer_string(s):
+def unescape_string(s):
     if s.startswith('"'):
-        return transfer_dbl_quo_string(s[1:-1])
+        return unescape_dbl_quo_string(s[1:-1])
     elif s.startswith("'"):
-        return transfer_quo_string(s[1:-1])
+        return unescape_quo_string(s[1:-1])
     else:
         return s
 
@@ -72,7 +81,7 @@ def transfer_string(s):
 def extract_cmd_args(cmd):
     if cmd.head != "cmd":
         return []
-    return [transfer_string(x.tail[0]) for x in cmd.tail]
+    return [unescape_string(x.tail[0]) for x in cmd.tail]
 
 
 def extract_cmd_list(ast):
@@ -208,7 +217,8 @@ class Test(Command):
         self.print("your input: " + line)
 
 
-# TODO: support pipeline
+# TODO: support background('&', 'bg', 'jobs')
+# TODO: support redirection
 # TODO: support script
 # TODO: alias
 class Shell:
@@ -260,7 +270,7 @@ class Shell:
         self.is_running = True
         while self.is_running:
             try:
-                line = input(self.ps1)
+                line = input(self.cwd + ' ' + self.ps1)
 
                 if not line:
                     continue
@@ -351,6 +361,10 @@ def main():
         path=path.split(os.path.pathsep)
     )
     if len(sys.argv) <= 1:
+        print("-------------------------")
+        print("Welcome to PyShell")
+        print("-------------------------")
+        print()
         sh.run()
     else:
         # execute script
@@ -359,10 +373,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # print("TEST")
-    # cmd = Echo(None, ["echo", "haha", "Good"])
-    # cmd.communicate()
-    # cmd = Command(None, None)
-    # cmd.communicate()
-
 
