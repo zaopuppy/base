@@ -87,7 +87,7 @@ def extract_cmd_args(cmd):
 def extract_cmd_list(ast):
     if ast.head != "start":
         return []
-    return [extract_cmd_args(c) for c in ast.tail]
+    return list(map(extract_cmd_args, filter(lambda x: x.head == "cmd", ast.tail)))
 
 
 class Command:
@@ -149,7 +149,7 @@ class Command:
                         (self.stdin, self.stdout, self.stderr)):
             f.close()
 
-    def print(self, msg, end='\n', flush=False):
+    def print(self, msg, end='\n', flush=True):
         if not isinstance(msg, str):
             msg = str(msg)
         self.stdout_write.write(msg + end)
@@ -220,6 +220,7 @@ class Test(Command):
 # TODO: support background('&', 'bg', 'jobs')
 # TODO: support redirection
 # TODO: support script
+# TODO: auto complete
 # TODO: alias
 class Shell:
     """
@@ -290,22 +291,51 @@ class Shell:
                     print()
                     continue
 
-                # create sub-processes
-                process_list = []
-                last_out = None
-                for args in cmd_list[0:-1]:
-                    p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
-                    process_list.append(p)
-                    last_out = p.stdout
-                process_list.append(self.create_subprocess(cmd_list[-1], stdin=last_out))
+                bg_flag = ast.tail[-1].head == "bg_flag"
 
-                process_list[-1].communicate()
+                if bg_flag:
+                    # FIXME: not good, should use sub-process instead of thread
+                    thread = threading.Thread(target=self.execute_commands_in_thread, daemon=True, args=[cmd_list])
+                    thread.start()
+                else:
+                    self.execute_commands(cmd_list)
+
+                # create sub-processes
             except KeyboardInterrupt:
                 print("^C")
                 continue
             except plyplus.TokenizeError as tokenizeError:
                 print(tokenizeError)
                 continue
+            except Exception as e:
+                print(e)
+                continue
+
+    def execute_commands_in_thread(self, *args):
+        """
+        wrapper for execution in thread
+        :param args: arguments for `execute_commands`
+        :return: None
+        """
+        self.execute_commands(*args)
+        print("done")
+
+    def execute_commands(self, cmd_list):
+        """
+        create sub-processes, pipe them together, then execute them in parallel
+        :param cmd_list: command list
+        :return: None
+        """
+        process_list = []
+        last_out = None
+        for args in cmd_list[0:-1]:
+            p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
+            process_list.append(p)
+            last_out = p.stdout
+        process_list.append(self.create_subprocess(cmd_list[-1], stdin=last_out))
+
+        process_list[-1].communicate()
+
 
     def find_cmd_in_paths(self, cmd):
         if os.path.isabs(cmd):
