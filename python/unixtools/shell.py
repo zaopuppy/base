@@ -126,9 +126,9 @@ class Command:
         self.execute()
         if self.stdin_read is not None and self.stdin_read is not sys.stdin:
             self.stdin_read.close()
-        if self.stdout_write is not None and self.stdout_write is not sys.stdin:
+        if self.stdout_write is not None and self.stdout_write is not sys.stdout:
             self.stdout_write.close()
-        if self.stderr_write is not None and self.stderr_write is not sys.stdin:
+        if self.stderr_write is not None and self.stderr_write is not sys.stderr:
             self.stderr_write.close()
 
     def execute(self):
@@ -198,7 +198,11 @@ class Shell:
     """
     """
     LINE_BUF_SIZE = 2048
-    PYTHON_PATH = "/usr/local/bin/python3"
+
+    if sys.platform == "win32":
+        PYTHON_PATH = "D:\\Python34\\python.exe"
+    else:
+        PYTHON_PATH = "/usr/local/bin/python3"
 
     def __init__(self, cwd=None, ps1="$ ", ps2=".. ", path=[]):
         if not cwd:
@@ -222,7 +226,7 @@ class Shell:
             'dir': Ls,
             'pwd': Pwd,
             'exit': Exit,
-            'Help': Help,
+            'help': Help,
             'test': Test,
         }
 
@@ -271,9 +275,6 @@ class Shell:
                 process_list[-1].communicate()
             except KeyboardInterrupt:
                 print("^C")
-                continue
-            except Exception as e:
-                print(e)
                 continue
 
     def find_cmd_in_paths(self, cmd):

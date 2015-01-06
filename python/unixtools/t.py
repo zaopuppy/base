@@ -21,11 +21,6 @@ def test_pipe1():
          "dir"],
         stdin=None, stdout=subprocess.PIPE, stderr=None)
 
-    # p2 = subprocess.Popen(
-    #     ["D:\\Python34\python.exe",
-    #      "D:\\source\\base\\python\\unixtools\\module\\grep.py",
-    #      "."],
-    #     stdin=pipe_read, stdout=None, stderr=None)
     p2 = subprocess.Popen(
         ["/usr/local/bin/python3",
          "/Volumes/Data/workspaces/base/python/unixtools/module/grep.py",
