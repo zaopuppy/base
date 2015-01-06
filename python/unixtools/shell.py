@@ -95,41 +95,50 @@ class Command:
         if stdin == Command.PIPE:
             p2cread, p2cwrite = os.pipe()
             self.stdin_read = io.TextIOWrapper(io.open(p2cread, "rb", -1))
-            self.stdin = io.open(p2cwrite, "wb", -1)
-        else:
+            self.stdin = io.TextIOWrapper(io.open(p2cwrite, "wb", -1))
+        elif stdin is None:
             self.stdin_read, self.stdin = sys.stdin, None
+        else:
+            self.stdin_read, self.stdin = stdin, None
 
         if stdout == Command.PIPE:
             c2pread, c2pwrite = os.pipe()
-            self.stdout = io.open(c2pread, "rb", -1)
+            self.stdout = io.TextIOWrapper(io.open(c2pread, "rb", -1))
             self.stdout_write = io.TextIOWrapper(io.open(c2pwrite, "wb", -1))
-        else:
+        elif stdout is None:
             self.stdout, self.stdout_write = None, sys.stdout
+        else:
+            self.stdout, self.stdout_write = None, stdout
 
         if stderr == Command.PIPE:
             errread, errwrite = os.pipe()
-            self.stderr = io.open(errread, "rb", -1)
+            self.stderr = io.TextIOWrapper(io.open(errread, "rb", -1))
             self.stderr_write = io.TextIOWrapper(io.open(errwrite, "wb", -1))
-        else:
+        elif stderr is None:
             self.stderr, self.stderr_write = None, sys.stderr
+        else:
+            self.stderr, self.stderr_write = None, stderr
 
-        self.thread = threading.Thread(target=self.execute, daemon=True)
+        self.thread = threading.Thread(target=self.thread_run, daemon=True)
         self.thread.start()
+
+    def thread_run(self):
+        self.execute()
+        if self.stdin_read is not None and self.stdin_read is not sys.stdin:
+            self.stdin_read.close()
+        if self.stdout_write is not None and self.stdout_write is not sys.stdin:
+            self.stdout_write.close()
+        if self.stderr_write is not None and self.stderr_write is not sys.stdin:
+            self.stderr_write.close()
 
     def execute(self):
         self.print("NotImplementedError")
 
     def communicate(self):
         self.thread.join()
-
-        for f in (self.stdin_read,
-                  self.stdin,
-                  self.stdout,
-                  self.stdout_write,
-                  self.stderr,
-                  self.stderr_write):
-            if f is not None:
-                f.close()
+        for f in filter(lambda x: x is not None,
+                        (self.stdin, self.stdout, self.stderr)):
+            f.close()
 
     def print(self, msg, end='\n', flush=False):
         # print(type(self.stdout_write))
@@ -157,7 +166,8 @@ class Cd(Command):
 
 class Ls(Command):
     def execute(self):
-        self.print(str(os.listdir(self.shell.cwd)) + "\r\n")
+        for f in os.listdir(self.shell.cwd):
+            self.print(f)
 
 
 class Pwd(Command):
@@ -175,6 +185,12 @@ class Help(Command):
         self.print(self.shell.cmd_map)
 
 
+class Test(Command):
+    def execute(self):
+        line = self.input('test> ')
+        self.print("your input: " + line)
+
+
 # TODO: support pipeline
 # TODO: support script
 # TODO: alias
@@ -182,6 +198,7 @@ class Shell:
     """
     """
     LINE_BUF_SIZE = 2048
+    PYTHON_PATH = "/usr/local/bin/python3"
 
     def __init__(self, cwd=None, ps1="$ ", ps2=".. ", path=[]):
         if not cwd:
@@ -206,6 +223,7 @@ class Shell:
             'pwd': Pwd,
             'exit': Exit,
             'Help': Help,
+            'test': Test,
         }
 
     def load_script_in_path(self, paths):
@@ -245,38 +263,18 @@ class Shell:
                 process_list = []
                 last_out = None
                 for args in cmd_list[0:-1]:
-                    print("begin create")
                     p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
-                    print("end create")
                     process_list.append(p)
                     last_out = p.stdout
                 process_list.append(self.create_subprocess(cmd_list[-1], stdin=last_out))
 
-                # run them
-                for p in process_list[0:-1]:
-                    p.stdout.close()
                 process_list[-1].communicate()
             except KeyboardInterrupt:
-                print()
+                print("^C")
                 continue
             except Exception as e:
                 print(e)
                 continue
-
-    @staticmethod
-    def execute(exe, args):
-        try:
-            return subprocess.Popen([exe, ] + args).communicate()
-        except Exception as e:
-            print("exception while execute: [{}]".format(exe))
-        except KeyboardInterrupt as e:
-            print("keyboard interrupt while execute: [{}]".format(exe))
-
-    def execute_python(self, script, args):
-        return self.execute(
-            "D:\\Python34\python.exe",
-            [script, ] + args
-        )
 
     def find_cmd_in_paths(self, cmd):
         if os.path.isabs(cmd):
@@ -296,23 +294,6 @@ class Shell:
             else:
                 pass
         return None
-
-    def process_command(self, cmd, args):
-        # try built-in command first
-        handler_name = "command_" + cmd
-        if hasattr(self, handler_name):
-            return getattr(self, handler_name)(cmd, args)
-
-        # find in paths
-        cmd_path = self.find_cmd_in_paths(cmd)
-        if not cmd_path:
-            print("[{}]: not such command or file".format(cmd))
-            return -1
-
-        if cmd_path.endswith(".py"):
-            return self.execute_python(cmd_path, args)
-        else:
-            return self.execute(cmd_path, args)
 
     def replace_variable(self, s):
         """ TODO: a very simple but usable implementation"""
@@ -337,7 +318,7 @@ class Shell:
                 raise Exception("Not such command or file")
             if full_path.endswith(".py"):
                 return subprocess.Popen(
-                    ["D:\\Python34\python.exe", full_path] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
+                    [self.PYTHON_PATH, full_path] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
             else:
                 return subprocess.Popen(
                     [full_path, ] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
