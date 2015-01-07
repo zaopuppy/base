@@ -78,10 +78,47 @@ def unescape_string(s):
         return s
 
 
+def extract_string(s):
+    if s.head != "string":
+        return None
+    return s.tail[0]
+
+
+def extract_redirect_in(redirect):
+    if redirect.head != "redirect_in":
+        return None
+    return extract_string(redirect.tail[0])
+
+
+def extract_redirect_out(redirect):
+    if redirect.head != "redirect_out":
+        return None
+    return extract_string(redirect.tail[0])
+
+
 def extract_cmd_args(cmd):
     if cmd.head != "cmd":
         return []
-    return [unescape_string(x.tail[0]) for x in cmd.tail]
+
+    args = list(map(unescape_string, (extract_string(y) for y in filter(lambda x: x.head == "string", cmd.tail))))
+
+    redirect_in_list = tuple(filter(lambda x: x.head == "redirect_in", cmd.tail))
+    if len(redirect_in_list) == 0:
+        redirect_in = None
+    elif len(redirect_in_list) == 1:
+        redirect_in = extract_redirect_in(redirect_in_list[0])
+    else:
+        raise Exception("obscure redirection(in)")
+
+    redirect_out_list = tuple(filter(lambda x: x.head == "redirect_out", cmd.tail))
+    if len(redirect_out_list) == 0:
+        redirect_out = None
+    elif len(redirect_out_list) == 1:
+        redirect_out = extract_redirect_out(redirect_out_list[0])
+    else:
+        raise Exception("obscure redirection(out)")
+
+    return Command(args, redirect_in=redirect_in, redirect_out=redirect_out)
 
 
 def extract_cmd_list(ast):
@@ -91,6 +128,22 @@ def extract_cmd_list(ast):
 
 
 class Command:
+    def __init__(self, args, redirect_in=None, redirect_out=None):
+        self.args = args
+        self.redirect_in = redirect_in
+        self.redirect_out = redirect_out
+
+
+class ExecuteTree:
+    """
+    pass
+    """
+    def __init__(self, ast):
+        self.cmd_list = extract_cmd_list(ast)
+        self.background = ast.tail[-1].head == "bg_flag"
+
+
+class BuiltIn:
     """
     pass
     """
@@ -101,7 +154,7 @@ class Command:
         self.shell = shell
         self.args = args
 
-        if stdin == Command.PIPE:
+        if stdin == BuiltIn.PIPE:
             p2cread, p2cwrite = os.pipe()
             self.stdin_read = io.TextIOWrapper(io.open(p2cread, "rb", -1))
             self.stdin = io.TextIOWrapper(io.open(p2cwrite, "wb", -1))
@@ -110,7 +163,7 @@ class Command:
         else:
             self.stdin_read, self.stdin = stdin, None
 
-        if stdout == Command.PIPE:
+        if stdout == BuiltIn.PIPE:
             c2pread, c2pwrite = os.pipe()
             self.stdout = io.TextIOWrapper(io.open(c2pread, "rb", -1))
             self.stdout_write = io.TextIOWrapper(io.open(c2pwrite, "wb", -1))
@@ -119,7 +172,7 @@ class Command:
         else:
             self.stdout, self.stdout_write = None, stdout
 
-        if stderr == Command.PIPE:
+        if stderr == BuiltIn.PIPE:
             errread, errwrite = os.pipe()
             self.stderr = io.TextIOWrapper(io.open(errread, "rb", -1))
             self.stderr_write = io.TextIOWrapper(io.open(errwrite, "wb", -1))
@@ -162,34 +215,34 @@ class Command:
         return self.stdin_read.readline(2048)
 
 
-class Echo(Command):
+class Echo(BuiltIn):
     def execute(self):
         self.print(" ".join(self.args[1:]))
 
 
-class Cd(Command):
+class Cd(BuiltIn):
     def execute(self):
         os.chdir(self.args[1])
         self.shell.cwd = self.args[1]
 
 
-class Ls(Command):
+class Ls(BuiltIn):
     def execute(self):
         for f in os.listdir(self.shell.cwd):
             self.print(f)
 
 
-class Pwd(Command):
+class Pwd(BuiltIn):
     def execute(self):
         self.print(self.shell.cwd)
 
 
-class Exit(Command):
+class Exit(BuiltIn):
     def execute(self):
         self.shell.is_running = False
 
 
-class Help(Command):
+class Help(BuiltIn):
     def execute(self):
         if len(self.args) > 1:
             match = self.args[1]
@@ -211,7 +264,7 @@ class Help(Command):
                 print()
 
 
-class Test(Command):
+class Test(BuiltIn):
     def execute(self):
         line = self.input('test> ')
         self.print("your input: " + line)
@@ -222,6 +275,7 @@ class Test(Command):
 # TODO: support script
 # TODO: auto complete
 # TODO: alias
+# TODO: input/output recording
 class Shell:
     """
     """
@@ -271,18 +325,23 @@ class Shell:
         self.is_running = True
         while self.is_running:
             try:
+                # FIXME: Ctrl-D doesn't work in Mac OS
                 line = input(self.cwd + ' ' + self.ps1)
 
                 if not line:
+                    print("not line")
                     continue
 
                 line = line.strip()
 
                 if len(line) == 0:
+                    print("len(line) == 0")
                     continue
 
                 # parse input
                 ast = self.parser.parse(line)
+
+                execute_tree = ExecuteTree(ast)
 
                 # get command list from input
                 cmd_list = extract_cmd_list(ast)

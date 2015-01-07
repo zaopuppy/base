@@ -59,6 +59,16 @@ def test_pipe():
     p.communicate()
 
 
+def test_redirect():
+    p = subprocess.Popen(
+        ["/usr/local/bin/python3",
+         "/Volumes/Data/workspaces/base/python/unixtools/module/grep.py",
+         "l"],
+        stdin=cmd.stdout, stdout=None, stderr=None)
+
+    p.communicate()
+
+
 def transfer_dbl_quo_string(s):
     result = ""
     escaping = False
@@ -137,7 +147,8 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    test_pipe()
+    # test_pipe()
+    test_redirect()
 
 
 
