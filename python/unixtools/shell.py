@@ -325,41 +325,22 @@ class Shell:
         self.is_running = True
         while self.is_running:
             try:
-                # FIXME: Ctrl-D doesn't work in Mac OS
+                # FIXME: Ctrl-D doesn't work
                 line = input(self.cwd + ' ' + self.ps1)
 
                 if not line:
-                    print("not line")
                     continue
 
                 line = line.strip()
 
                 if len(line) == 0:
-                    print("len(line) == 0")
                     continue
 
                 # parse input
                 ast = self.parser.parse(line)
 
-                execute_tree = ExecuteTree(ast)
+                self.execute(ExecuteTree(ast))
 
-                # get command list from input
-                cmd_list = extract_cmd_list(ast)
-                print(cmd_list)
-                if len(cmd_list) <= 0:
-                    print()
-                    continue
-
-                bg_flag = ast.tail[-1].head == "bg_flag"
-
-                if bg_flag:
-                    # FIXME: not good, should use sub-process instead of thread
-                    thread = threading.Thread(target=self.execute_commands_in_thread, daemon=True, args=[cmd_list])
-                    thread.start()
-                else:
-                    self.execute_commands(cmd_list)
-
-                # create sub-processes
             except KeyboardInterrupt:
                 print("^C")
                 continue
@@ -370,6 +351,14 @@ class Shell:
                 print(e)
                 continue
 
+    def execute(self, exe_tree):
+        if exe_tree.background:
+            # FIXME: not good, should use sub-process instead of thread
+            thread = threading.Thread(target=self.execute_commands_in_thread, daemon=True, args=[exe_tree.cmd_list])
+            thread.start()
+        else:
+            self.execute_commands(exe_tree.cmd_list)
+
     def execute_commands_in_thread(self, *args):
         """
         wrapper for execution in thread
@@ -377,7 +366,7 @@ class Shell:
         :return: None
         """
         self.execute_commands(*args)
-        print("done")
+        print("[[done]]")
 
     def execute_commands(self, cmd_list):
         """
@@ -387,14 +376,13 @@ class Shell:
         """
         process_list = []
         last_out = None
-        for args in cmd_list[0:-1]:
-            p = self.create_subprocess(args, stdin=last_out, stdout=subprocess.PIPE)
+        for cmd in cmd_list[0:-1]:
+            p = self.create_subprocess(cmd.args, stdin=last_out, stdout=subprocess.PIPE)
             process_list.append(p)
             last_out = p.stdout
-        process_list.append(self.create_subprocess(cmd_list[-1], stdin=last_out))
+        process_list.append(self.create_subprocess(cmd_list[-1].args, stdin=last_out))
 
         process_list[-1].communicate()
-
 
     def find_cmd_in_paths(self, cmd):
         if os.path.isabs(cmd):
@@ -435,7 +423,7 @@ class Shell:
         else:
             full_path = self.find_cmd_in_paths(cmd)
             if not full_path:
-                raise Exception("Not such command or file")
+                raise Exception("[{}]: No such command or file".format(cmd))
             if full_path.endswith(".py"):
                 return subprocess.Popen(
                     [self.PYTHON_PATH, full_path] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
