@@ -223,7 +223,7 @@ class Echo(BuiltIn):
 class Cd(BuiltIn):
     def execute(self):
         os.chdir(self.args[1])
-        self.shell.cwd = self.args[1]
+        self.shell.cwd = os.getcwd()
 
 
 class Ls(BuiltIn):
