@@ -39,7 +39,7 @@ def get_line(file_list, max_len=4096):
             with open(f, "rb") as fp:
                 # _io.BufferedReader
                 for line in iter(lambda: fp.readline(max_len), b''):
-                    # TODO: encoding
+                    # TODO: separate binary file and text file
                     yield line.decode()
 
 

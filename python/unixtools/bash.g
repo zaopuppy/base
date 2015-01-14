@@ -18,7 +18,7 @@ string: STRING | RAW_STRING;
 %fragment DBL_QUOTE: '"';
 
 STRING : '(' DBL_QUOTE STRING_INTERNAL DBL_QUOTE '|' QUOTE STRING_INTERNAL QUOTE ')';
-RAW_STRING: '[:\\/~\.\+\-\?_0-9a-zA-Z]+';
+RAW_STRING: '[:\\/~\.\+\-\?\$_0-9a-zA-Z]+';
 
 COMMENT: '\#[^\n]*'(%ignore);
 SPACES: '[ \t\r]+' (%ignore);

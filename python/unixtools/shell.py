@@ -40,7 +40,7 @@ def unescape_dbl_quo_string(s):
             if c == '\\':
                 result += '\\'
             elif c == 'a':
-                # ascii bell
+                # TODO: ascii bell
                 result += '\a'
             elif c == 'b':
                 result += '\b'
@@ -81,7 +81,7 @@ def unescape_string(s):
 def extract_string(s):
     if s.head != "string":
         return None
-    return s.tail[0]
+    return unescape_string(s.tail[0])
 
 
 def extract_redirect_in(redirect):
@@ -100,7 +100,7 @@ def extract_cmd_args(cmd):
     if cmd.head != "cmd":
         return []
 
-    args = list(map(unescape_string, (extract_string(y) for y in filter(lambda x: x.head == "string", cmd.tail))))
+    args = [extract_string(y) for y in filter(lambda x: x.head == "string", cmd.tail)]
 
     redirect_in_list = tuple(filter(lambda x: x.head == "redirect_in", cmd.tail))
     if len(redirect_in_list) == 0:
@@ -150,32 +150,32 @@ class BuiltIn:
 
     PIPE = -1
 
-    def __init__(self, shell, args, stdin=None, stdout=None, stderr=None):
+    def __init__(self, shell, args, stdin=None, stdout=None, stderr=None, redirect=None):
         self.shell = shell
         self.args = args
 
         if stdin == BuiltIn.PIPE:
-            p2cread, p2cwrite = os.pipe()
-            self.stdin_read = io.TextIOWrapper(io.open(p2cread, "rb", -1))
-            self.stdin = io.TextIOWrapper(io.open(p2cwrite, "wb", -1))
+            pipe_in, pipe_out = os.pipe()
+            self.stdin_read = io.TextIOWrapper(io.open(pipe_in, "rb", -1))
+            self.stdin = io.TextIOWrapper(io.open(pipe_out, "wb", -1))
         elif stdin is None:
             self.stdin_read, self.stdin = sys.stdin, None
         else:
             self.stdin_read, self.stdin = stdin, None
 
         if stdout == BuiltIn.PIPE:
-            c2pread, c2pwrite = os.pipe()
-            self.stdout = io.TextIOWrapper(io.open(c2pread, "rb", -1))
-            self.stdout_write = io.TextIOWrapper(io.open(c2pwrite, "wb", -1))
+            pipe_in, pipe_out = os.pipe()
+            self.stdout = io.TextIOWrapper(io.open(pipe_in, "rb", -1))
+            self.stdout_write = io.TextIOWrapper(io.open(pipe_out, "wb", -1))
         elif stdout is None:
             self.stdout, self.stdout_write = None, sys.stdout
         else:
             self.stdout, self.stdout_write = None, stdout
 
         if stderr == BuiltIn.PIPE:
-            errread, errwrite = os.pipe()
-            self.stderr = io.TextIOWrapper(io.open(errread, "rb", -1))
-            self.stderr_write = io.TextIOWrapper(io.open(errwrite, "wb", -1))
+            pipe_in, pipe_out = os.pipe()
+            self.stderr = io.TextIOWrapper(io.open(pipe_in, "rb", -1))
+            self.stderr_write = io.TextIOWrapper(io.open(pipe_out, "wb", -1))
         elif stderr is None:
             self.stderr, self.stderr_write = None, sys.stderr
         else:
@@ -286,15 +286,23 @@ class Shell:
     else:
         PYTHON_PATH = "/usr/local/bin/python3"
 
-    def __init__(self, cwd=None, ps1="$ ", ps2=".. ", path=[]):
-        if not cwd:
-            self.cwd = os.getcwd()
-        else:
-            self.cwd = cwd
-        self.ps1 = ps1
-        self.ps2 = ps2
+    # def __init__(self, cwd=None, ps1="$ ", ps2=".. ", path=[]):
+    def __init__(self, **env):
+        if "PWD" not in env:
+            env["PWD"] = os.getcwd()
+        if "PS1" not in env:
+            env["PS1"] = "$ "
+        if "PS2" not in env:
+            env["PS2"] = ".. "
+
+        self.env = env
+
+        self.cwd = env.get("PWD")
+        self.ps1 = env.get("PS1")
+        self.ps2 = env.get("PS2")
+        self.paths = env.get("PATH", [])
+
         self.is_running = False
-        self.paths = path
         # use RB-Tree instead of normal map, we need auto-complete
         # TODO: self.cmd_map = [] -> "path" -> [ "cmd.exe", "fde.dll" ]
         self.cmd_map = {}
@@ -331,7 +339,7 @@ class Shell:
                 if not line:
                     continue
 
-                line = line.strip()
+                line = self.substitute_variable(line)
 
                 if len(line) == 0:
                     continue
@@ -403,8 +411,40 @@ class Shell:
                 pass
         return None
 
-    def replace_variable(self, s):
-        """ TODO: a very simple but usable implementation"""
+    def substitute(self, s):
+        # substitute $variable first, then use regular expression to grub file names
+        return self.substitute_filenames(self.substitute_variable(s))
+
+    def substitute_filenames(self, s):
+        return s
+
+    def substitute_variable(self, s):
+        """
+        $[0-9]
+        ${.*}
+        $word
+        *
+        ?
+        [0-9]+
+        :param s: the string we need to process
+        :return: the substituted string
+        """
+        # state_normal = 0
+        # state_quo_string = 1
+        # state_dbl_quo_string = 2
+        # state = state_normal
+        # for idx, c in enumerate(s):
+        #     if state == state_normal:
+        #         if c == "'":
+        #             state = state_quo_string
+        #         elif c ==
+        #     elif state == state_quo_string:
+        #         pass
+        #     elif state == state_dbl_quo_string:
+        #         pass
+        #     else:
+        #         pass
+
         if s == "$?":
             if not self.errno:
                 self.errno = 0
@@ -434,9 +474,7 @@ class Shell:
 
 def main():
     path = os.path.pathsep.join((os.getenv("PATH"), os.path.join(os.getcwd(), "module")))
-    sh = Shell(
-        path=path.split(os.path.pathsep)
-    )
+    sh = Shell(PATH=path.split(os.path.pathsep))
     if len(sys.argv) <= 1:
         print("-------------------------")
         print("Welcome to PyShell")
