@@ -11,7 +11,12 @@ import os.path
 import subprocess
 import sys
 import threading
+import time
+
+from functools import reduce
+
 import plyplus
+from plyplus.strees import STree
 
 
 try:
@@ -339,15 +344,13 @@ class Shell:
                 if not line:
                     continue
 
-                line = self.substitute_variable(line)
-
                 if len(line) == 0:
                     continue
 
                 # parse input
                 ast = self.parser.parse(line)
 
-                self.execute(ExecuteTree(ast))
+                self.execute(ExecuteTree(self.expand(ast)))
 
             except KeyboardInterrupt:
                 print("^C")
@@ -357,6 +360,7 @@ class Shell:
                 continue
             except Exception as e:
                 print(e)
+                time.sleep(0.5)
                 continue
 
     def execute(self, exe_tree):
@@ -470,6 +474,20 @@ class Shell:
             else:
                 return subprocess.Popen(
                     [full_path, ] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
+
+    def expand(self, ast):
+        """
+        expand regular expression in command
+        :param ast: the ast before we expand
+        :return: the expanded ast(s) we created, always a list
+        """
+        # return ast
+        if not isinstance(ast, STree):
+            return ast
+        ast.tail = reduce(
+            lambda x, y: x + y,
+            map(self.expand, ast.tail))
+        return [ast]
 
 
 def main():
