@@ -1,8 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+A simple pseudo shell, designed as a environment for executing py-cmd-tools.
 
-__all__ = ["Shell"]
+This program can execute both platform executable files and python scripts.
+
+By Yi Zhao 1/15/2015
+
+"""
+
+__author__ = "Yi Zhao"
 
 
 import io
@@ -11,7 +19,12 @@ import os.path
 import subprocess
 import sys
 import threading
+
+
+from functools import reduce
+
 import plyplus
+from plyplus.strees import STree
 
 
 try:
@@ -156,6 +169,7 @@ class BuiltIn:
 
         if stdin == BuiltIn.PIPE:
             pipe_in, pipe_out = os.pipe()
+            # FIXME: should not use TextIOWrapper, or program like `zcat` will fail
             self.stdin_read = io.TextIOWrapper(io.open(pipe_in, "rb", -1))
             self.stdin = io.TextIOWrapper(io.open(pipe_out, "wb", -1))
         elif stdin is None:
@@ -198,7 +212,7 @@ class BuiltIn:
 
     def communicate(self):
         self.thread.join()
-        for f in filter(lambda x: x is not None,
+        for f in filter(lambda _: _ is not None,
                         (self.stdin, self.stdout, self.stderr)):
             f.close()
 
@@ -333,21 +347,22 @@ class Shell:
         self.is_running = True
         while self.is_running:
             try:
-                # FIXME: Ctrl-D doesn't work
-                line = input(self.cwd + ' ' + self.ps1)
+                try:
+                    line = input(self.cwd + ' ' + self.ps1)
+                except Exception:
+                    print()
+                    break
 
                 if not line:
                     continue
 
-                line = self.substitute_variable(line)
-
-                if len(line) == 0:
+                if len(line.strip()) == 0:
                     continue
 
                 # parse input
                 ast = self.parser.parse(line)
 
-                self.execute(ExecuteTree(ast))
+                self.execute(ExecuteTree(self.expand(ast)[0]))
 
             except KeyboardInterrupt:
                 print("^C")
@@ -397,7 +412,7 @@ class Shell:
             try:
                 os.stat(cmd)
                 return cmd
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 return None
 
         for path, cmd_list in self.cmd_map.items():
@@ -410,47 +425,6 @@ class Shell:
             else:
                 pass
         return None
-
-    def substitute(self, s):
-        # substitute $variable first, then use regular expression to grub file names
-        return self.substitute_filenames(self.substitute_variable(s))
-
-    def substitute_filenames(self, s):
-        return s
-
-    def substitute_variable(self, s):
-        """
-        $[0-9]
-        ${.*}
-        $word
-        *
-        ?
-        [0-9]+
-        :param s: the string we need to process
-        :return: the substituted string
-        """
-        # state_normal = 0
-        # state_quo_string = 1
-        # state_dbl_quo_string = 2
-        # state = state_normal
-        # for idx, c in enumerate(s):
-        #     if state == state_normal:
-        #         if c == "'":
-        #             state = state_quo_string
-        #         elif c ==
-        #     elif state == state_quo_string:
-        #         pass
-        #     elif state == state_dbl_quo_string:
-        #         pass
-        #     else:
-        #         pass
-
-        if s == "$?":
-            if not self.errno:
-                self.errno = 0
-            return str(self.errno)
-        else:
-            return s
 
     def is_builtin(self, cmd):
         return cmd in self.builtin.keys()
@@ -471,13 +445,50 @@ class Shell:
                 return subprocess.Popen(
                     [full_path, ] + args[1:], stdin=stdin, stdout=stdout, stderr=stderr)
 
+    def expand(self, ast):
+        """
+        expand shell input string
+        :param ast:
+        :return:
+        """
+        if not isinstance(ast, STree):
+            return [ast]
+        if ast.head == "string":
+            if ast.tail[0][0] not in "\"'":
+                return list(map(
+                    lambda _: STree("string", [_]),
+                    self.expand_string(ast.tail[0])))
+            else:
+                return [ast]
+        else:
+            ast.tail = reduce(
+                lambda x, y: x + y,
+                map(self.expand, ast.tail)
+            )
+            return [ast]
+
+    def expand_string(self, s):
+        """
+        a very simple and (also) very buggy implementation... :(
+        :param s:
+        :return:
+        """
+        # TODO: complete this method
+        if not self.errno:
+            self.errno = 0
+        s = s.replace('$?', str(self.errno))
+        if s == '*':
+            return os.listdir(self.cwd)
+        else:
+            return [s]
+
 
 def main():
     path = os.path.pathsep.join((os.getenv("PATH"), os.path.join(os.getcwd(), "module")))
     sh = Shell(PATH=path.split(os.path.pathsep))
     if len(sys.argv) <= 1:
         print("-------------------------")
-        print("Welcome to PyShell")
+        print("Welcome to Python Pseudo-Shell")
         print("-------------------------")
         print()
         sh.run()
