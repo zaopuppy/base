@@ -8,6 +8,8 @@ import sys
 import re
 import getopt
 
+import os.path
+
 
 try:
     import readline
@@ -35,7 +37,7 @@ def get_line(file_list, max_len=4096):
             # print("input: " + line)
             yield line
     else:
-        for f in file_list:
+        for f in filter(lambda _: os.path.isfile(_), file_list):
             with open(f, "rb") as fp:
                 # _io.BufferedReader
                 for line in iter(lambda: fp.readline(max_len), b''):
