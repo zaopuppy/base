@@ -145,10 +145,38 @@ def main():
     process_list[-1].communicate()
 
 
+def substitute(s):
+    """
+    *
+    ?
+    :param s:
+    :return:
+    """
+    state_normal = 0
+    state_quo_string = 1
+    state_dbl_quo_string = 2
+    state = state_normal
+    for idx, c in enumerate(s):
+        if state == state_normal:
+            if c == "'":
+                state = state_quo_string
+            elif c == '"':
+                state = state_dbl_quo_string
+            else:
+                pass
+        elif state == state_quo_string:
+            pass
+        elif state == state_dbl_quo_string:
+            pass
+        else:
+            pass
+
+
 if __name__ == "__main__":
     # main()
     # test_pipe()
-    test_redirect()
+    # test_redirect()
+    print(substitute("just a test *"))
 
 
 
