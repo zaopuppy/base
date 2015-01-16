@@ -242,8 +242,19 @@ class Cd(BuiltIn):
 
 class Ls(BuiltIn):
     def execute(self):
-        for f in os.listdir(self.shell.cwd):
-            self.print(f)
+        args = self.args[1:]
+        if len(args) == 0:
+            args.append(self.shell.cwd)
+
+        for arg in args:
+            if not os.path.exists(arg):
+                self.print("No such file or directory")
+                continue
+            if os.path.isdir(arg):
+                for f in os.listdir(arg):
+                    self.print(f)
+            else:
+                self.print(arg)
 
 
 class Pwd(BuiltIn):
