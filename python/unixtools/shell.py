@@ -20,7 +20,6 @@ import subprocess
 import sys
 import threading
 
-
 from functools import reduce
 
 import plyplus
@@ -295,6 +294,30 @@ class Test(BuiltIn):
         self.print("your input: " + line)
 
 
+def setup_readline():
+    if not readline:
+        return
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(file_name_completer)
+    # ' \t\n`~!@#$%^&*()-=+[{]}\\|;:\'",<>/?'
+    readline.set_completer_delims(" \t\n")
+
+
+def file_name_completer(text, index):
+    # print(text, index)
+    dirname = os.path.dirname(text)
+    if dirname != '' and not os.path.isdir(dirname):
+        return None
+    basename = os.path.basename(text)
+    matches = []
+    for f in os.listdir(dirname if dirname != '' else '.'):
+        if f.startswith(basename):
+            matches.append(os.path.join(dirname, f))
+    if index > len(matches) - 1:
+        return None
+    return matches[index]
+
+
 # TODO: support background('&', 'bg', 'jobs')
 # TODO: support redirection
 # TODO: support script
@@ -345,13 +368,13 @@ class Shell:
             'test': Test,
         }
 
+        setup_readline()
+
     def load_script_in_path(self, paths):
         for p in paths:
             self.cmd_map[p] = []
             for f in os.listdir(p):
                 self.cmd_map[p].append(f)
-                # file_name = os.path.basename(f)
-                # self.cmd_map[file_name] = os.path.join(p, f)
 
     def run(self):
         # interactive mode
