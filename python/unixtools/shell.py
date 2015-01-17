@@ -295,6 +295,10 @@ class Test(BuiltIn):
 
 
 def setup_readline():
+    """
+    setup readline if readline is installed
+    :return:
+    """
     if not readline:
         return
     readline.parse_and_bind("tab: complete")
@@ -304,6 +308,12 @@ def setup_readline():
 
 
 def file_name_completer(text, index):
+    """
+    a simple completer for testing only
+    :param text:
+    :param index:
+    :return: the n'th candidate string
+    """
     # print(text, index)
     dirname = os.path.dirname(text)
     if dirname != '' and not os.path.isdir(dirname):
@@ -312,7 +322,11 @@ def file_name_completer(text, index):
     matches = []
     for f in os.listdir(dirname if dirname != '' else '.'):
         if f.startswith(basename):
-            matches.append(os.path.join(dirname, f))
+            p = os.path.join(dirname, f)
+            if os.path.isdir(p):
+                matches.append(os.path.join(p, ''))
+            else:
+                matches.append(p)
     if index > len(matches) - 1:
         return None
     return matches[index]

@@ -176,7 +176,8 @@ if __name__ == "__main__":
     # main()
     # test_pipe()
     # test_redirect()
-    print(substitute("just a test *"))
+    # print(substitute("just a test *"))
+    print(os.path.join("a", "b", "\\"))
 
 
 
